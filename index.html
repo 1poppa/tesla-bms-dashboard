@@ -340,6 +340,15 @@
   }
 
   async function refreshAll() {
+    await fetch("https://kadbqiuewsdtdqqybnwy.supabase.co/functions/v1/super-action", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+  },
+  body: JSON.stringify({ source: "refresh_button" }),
+});
     await fetchRows();
     buildMonthList();
 
@@ -380,4 +389,5 @@
 </script>
 </body>
 </html>
+
 

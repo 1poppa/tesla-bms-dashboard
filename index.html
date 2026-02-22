@@ -45,11 +45,12 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 async function loadData() {
 
 const { data, error } = await sb
-.from("tesla_snapshots")
-.select("created_at, energy_remaining_kwh")
-.not("energy_remaining_kwh", "is", null)
-.order("created_at", { ascending: false })
-.limit(1);
+  .from("tesla_snapshots")
+  .select("*")
+  .eq("vehicle_state", "battery_health")
+  .not("energy_remaining_kwh", "is", null)
+  .order("captured_at", { ascending: false })
+  .limit(1);
 
 if(error) {
 document.getElementById("status").innerText = "Error";

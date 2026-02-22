@@ -46,7 +46,8 @@ async function loadData() {
 
 const { data, error } = await sb
 .from("tesla_snapshots")
-.select("*")
+.select("created_at, energy_remaining_kwh")
+.not("energy_remaining_kwh", "is", null)
 .order("created_at", { ascending: false })
 .limit(1);
 
@@ -62,7 +63,7 @@ return;
 
 document.getElementById("status").innerText = "Connected";
 document.getElementById("capacity").innerText =
-data[0].usable_capacity_kwh + " kWh";
+  data[0].energy_remaining_kwh + " kWh";
 
 }
 

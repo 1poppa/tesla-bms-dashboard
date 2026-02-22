@@ -344,8 +344,8 @@
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "apikey": SUPABASE_ANON_KEY,
-    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    "apikey": SUPABASE_KEY,
+    "Authorization": `Bearer ${SUPABASE_KEY}`,
   },
   body: JSON.stringify({ source: "refresh_button" }),
 });
@@ -389,5 +389,6 @@
 </script>
 </body>
 </html>
+
 
 

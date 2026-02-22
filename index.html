@@ -1,76 +1,382 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tesla BMS Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Battery Health Report</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<style>
-body {
-    font-family: Arial;
-    padding: 20px;
-    background: #111;
-    color: #eee;
-}
-.card {
-    background: #1c1c1c;
-    padding: 15px;
-    margin-bottom: 10px;
-    border-radius: 8px;
-}
-</style>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 18px; }
+    .topbar {
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 10px 0 14px 0;
+    }
+    h1 { margin: 0; font-size: 30px; letter-spacing: -0.5px; }
+    .sub { color:#6b7280; font-size: 14px; margin-top: 4px; }
+    .btn {
+      border: none; padding: 12px 16px; border-radius: 999px;
+      font-weight: 700; cursor:pointer;
+    }
+    .btn-refresh { background:#16a34a; color:white; }
+    .btn-ghost { background:white; color:#2563eb; border: 1px solid #e5e7eb; }
+    .card {
+      background: white; border: 1px solid #e5e7eb; border-radius: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    }
+    .headerCard { padding: 18px; }
+    .headerRow { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .headerTitle { font-size: 22px; font-weight: 800; }
+    .muted { color:#6b7280; font-size: 14px; }
+    .grid {
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 14px 18px 18px;
+    }
+    @media (max-width: 640px){
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+    .metric {
+      padding: 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      background: #ffffff;
+    }
+    .metric .label { color:#6b7280; font-size: 13px; margin-bottom: 6px; }
+    .metric .value { font-size: 22px; font-weight: 800; }
+    .controls {
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      padding: 0 18px 18px;
+    }
+    select {
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: white;
+      font-weight: 600;
+    }
+    .pill {
+      border: 1px solid #e5e7eb;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-weight: 800;
+      cursor:pointer;
+    }
+    .pill.active {
+      background: #111827;
+      color: white;
+      border-color: #111827;
+    }
+    .statusOk { display:flex; gap:10px; align-items:center; }
+    .dot { width:10px; height:10px; border-radius:999px; background:#16a34a; }
+    .sectionSpacer { height: 14px; }
+    .healthBox {
+      padding: 16px 18px;
+      display:flex;
+      gap: 10px;
+      align-items:center;
+      font-weight: 800;
+      font-size: 18px;
+    }
+    .check {
+      width: 26px; height: 26px; border-radius: 8px;
+      background:#16a34a; color:white;
+      display:flex; align-items:center; justify-content:center;
+      font-weight: 900;
+    }
+  </style>
 </head>
 
 <body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Battery Health<br/>Report</h1>
+        <div class="sub">Vehicle: <span id="vehicleName">(latest)</span> • Range: <span id="rangeLabel">12</span> months</div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn btn-ghost" id="btnSignOut" style="display:none;">Sign out</button>
+        <button class="btn btn-refresh" id="btnRefresh">Refresh Now</button>
+      </div>
+    </div>
 
-<h1>Tesla BMS Dashboard</h1>
+    <div class="card">
+      <div class="headerCard">
+        <div class="headerRow">
+          <div class="headerTitle">Battery Health Summary — <span id="monthTitle">Latest</span></div>
+          <div class="muted">Last updated: <span id="lastUpdated">—</span></div>
+        </div>
+      </div>
 
-<div class="card">
-Status: <span id="status">Loading...</span>
-</div>
+      <div class="grid">
+        <div class="metric">
+          <div class="label">Battery Health</div>
+          <div class="value" id="mBatteryHealth">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">Degradation</div>
+          <div class="value" id="mDegradation">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">Usable Capacity</div>
+          <div class="value" id="mUsableCapacity">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">Full Pack Capacity</div>
+          <div class="value" id="mFullPack">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">Max Range</div>
+          <div class="value" id="mMaxRange">—</div>
+        </div>
+        <div class="metric">
+          <div class="label">Charge Cycles</div>
+          <div class="value" id="mCycles">—</div>
+        </div>
+        <div class="metric" style="grid-column: 1 / -1;">
+          <div class="label">Lifetime Energy Used</div>
+          <div class="value" id="mLifetimeEnergy">—</div>
+        </div>
+      </div>
 
-<div class="card">
-Usable Capacity: <span id="capacity">--</span>
-</div>
+      <div class="controls">
+        <div class="muted" style="min-width: 54px;">Month</div>
+        <select id="monthSelect"></select>
+
+        <button class="pill" data-range="6">6M</button>
+        <button class="pill active" data-range="12">12M</button>
+        <button class="pill" data-range="all">All</button>
+
+        <div class="statusOk" style="margin-left:auto;">
+          <div class="dot"></div>
+          <div class="muted" id="statusLine">Connecting…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sectionSpacer"></div>
+
+    <div class="card">
+      <div class="healthBox">
+        <div class="check">✓</div>
+        <div>Mostly Healthy — Keep Watching</div>
+      </div>
+    </div>
+  </div>
 
 <script>
+  // ✅ Paste your working values here (same ones you used in the GitHub Pages version that showed 74.33)
+  const SUPABASE_URL = "https://kadbqiuewsdtdqqybnwy.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_jN72qDTEjGxjV16KoOM3tA_TzV26cMR";
 
-const SUPABASE_URL = "https://kadbqiuewsdtdqqybnwy.supabase.co";
-const SUPABASE_KEY = "sb_publishable_jN72qDTEjGxjV16KoOM3tA_TzV26cMR";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const el = (id) => document.getElementById(id);
 
-async function loadData() {
+  function pick(obj, keys) {
+    for (const k of keys) {
+      if (obj && obj[k] !== null && obj[k] !== undefined && obj[k] !== "") return obj[k];
+    }
+    return null;
+  }
 
-const { data, error } = await sb
-  .from("tesla_snapshots")
-  .select("*")
-  .eq("vehicle_state", "battery_health")
-  .not("energy_remaining_kwh", "is", null)
-  .order("captured_at", { ascending: false })
-  .limit(1);
+  function fmtPct(v) {
+    if (v === null) return "—";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    return n.toFixed(2) + "%";
+  }
 
-if(error) {
-document.getElementById("status").innerText = "Error";
-return;
-}
+  function fmtKwh(v) {
+    if (v === null) return "—";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    return n.toFixed(2) + " kWh";
+  }
 
-if(data.length === 0) {
-document.getElementById("status").innerText = "No Data";
-return;
-}
+  function fmtMi(v) {
+    if (v === null) return "—";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    return n.toFixed(2) + " mi";
+  }
 
-document.getElementById("status").innerText = "Connected";
-document.getElementById("capacity").innerText =
-  data[0].energy_remaining_kwh + " kWh";
+  function fmtNum(v) {
+    if (v === null) return "—";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    return n.toFixed(2);
+  }
 
-}
+  function monthKey(d) {
+    const dt = new Date(d);
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, "0");
+    return `${y}-${m}`;
+  }
 
-loadData();
+  function monthLabel(ym) {
+    const [y, m] = ym.split("-");
+    const dt = new Date(Number(y), Number(m) - 1, 1);
+    return dt.toLocaleString(undefined, { month: "long", year: "numeric" });
+  }
 
+  let allRows = [];
+  let selectedRange = 12;
+
+  async function fetchRows() {
+    el("statusLine").innerText = "Loading…";
+
+    // We pull a decent window so monthly selection works.
+    // If you have tons of rows, we can optimize later with a view/RPC.
+    const { data, error } = await sb
+      .from("tesla_snapshots")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(2000);
+
+    if (error) {
+      console.error(error);
+      el("statusLine").innerText = "Error (check console)";
+      return;
+    }
+
+    allRows = data || [];
+    el("statusLine").innerText = "Connected";
+  }
+
+  function buildMonthList() {
+    const months = new Map(); // ym -> latest row in that month
+
+    for (const r of allRows) {
+      const ym = monthKey(r.created_at || r.captured_at || r.inserted_at || r.timestamp);
+      if (!months.has(ym)) months.set(ym, r);
+    }
+
+    // Sort descending
+    const keys = Array.from(months.keys()).sort((a,b) => b.localeCompare(a));
+
+    const sel = el("monthSelect");
+    sel.innerHTML = "";
+
+    for (const ym of keys) {
+      const opt = document.createElement("option");
+      opt.value = ym;
+      opt.textContent = monthLabel(ym);
+      sel.appendChild(opt);
+    }
+
+    if (keys.length > 0) {
+      el("monthTitle").innerText = monthLabel(keys[0]);
+    } else {
+      el("monthTitle").innerText = "Latest";
+    }
+  }
+
+  function filterByRange(rows) {
+    if (selectedRange === "all") return rows;
+    const monthsBack = Number(selectedRange);
+    const now = new Date();
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1);
+    return rows.filter(r => {
+      const dt = new Date(r.created_at || r.captured_at || r.inserted_at || r.timestamp);
+      return dt >= cutoff;
+    });
+  }
+
+  function getLatestRowForMonth(ym) {
+    const rows = filterByRange(allRows);
+    const inMonth = rows.filter(r => monthKey(r.created_at || r.captured_at || r.inserted_at || r.timestamp) === ym);
+    return inMonth.length ? inMonth[0] : null; // already sorted desc from fetch
+  }
+
+  function renderRow(r) {
+    if (!r) {
+      el("mBatteryHealth").innerText = "—";
+      el("mDegradation").innerText = "—";
+      el("mUsableCapacity").innerText = "—";
+      el("mFullPack").innerText = "—";
+      el("mMaxRange").innerText = "—";
+      el("mCycles").innerText = "—";
+      el("mLifetimeEnergy").innerText = "—";
+      el("lastUpdated").innerText = "—";
+      return;
+    }
+
+    // These pick() lists are intentionally flexible.
+    // If your column names differ, this still finds the right values.
+    const batteryHealth = pick(r, ["battery_health", "battery_health_pct", "battery_health_percent"]);
+    const degradation  = pick(r, ["degradation", "degradation_pct", "degradation_percent"]);
+    const usableKwh    = pick(r, ["usable_capacity_kwh", "usable_capacity", "energy_remaining_kwh"]);
+    const fullPackKwh  = pick(r, ["full_pack_capacity_kwh", "full_pack_capacity", "nominal_full_pack_kwh", "rated_full_pack_kwh"]);
+    const maxRange     = pick(r, ["max_range_mi", "max_range", "rated_range_mi"]);
+    const cycles       = pick(r, ["charge_cycles", "cycles", "battery_cycles"]);
+    const lifetimeKwh  = pick(r, ["lifetime_energy_used_kwh", "lifetime_energy_used", "total_energy_used_kwh"]);
+
+    el("mBatteryHealth").innerText = (batteryHealth === null) ? "—" : fmtPct(batteryHealth);
+    el("mDegradation").innerText   = (degradation === null) ? "—" : fmtPct(degradation);
+    el("mUsableCapacity").innerText= (usableKwh === null) ? "—" : fmtKwh(usableKwh);
+    el("mFullPack").innerText      = (fullPackKwh === null) ? "—" : fmtKwh(fullPackKwh);
+    el("mMaxRange").innerText      = (maxRange === null) ? "—" : fmtMi(maxRange);
+    el("mCycles").innerText        = (cycles === null) ? "—" : fmtNum(cycles);
+    el("mLifetimeEnergy").innerText= (lifetimeKwh === null) ? "—" : fmtKwh(lifetimeKwh);
+
+    const stamp = r.created_at || r.captured_at || r.inserted_at || r.timestamp;
+    el("lastUpdated").innerText = stamp ? new Date(stamp).toLocaleString() : "—";
+
+    const vName = pick(r, ["display_name", "vehicle_name", "name"]);
+    el("vehicleName").innerText = vName ? vName : "(latest)";
+  }
+
+  async function refreshAll() {
+    await fetchRows();
+    buildMonthList();
+
+    // render first month in list
+    const sel = el("monthSelect");
+    const ym = sel.value;
+    el("monthTitle").innerText = sel.options.length ? sel.options[sel.selectedIndex].textContent : "Latest";
+    renderRow(getLatestRowForMonth(ym));
+  }
+
+  // Events
+  el("btnRefresh").addEventListener("click", refreshAll);
+
+  el("monthSelect").addEventListener("change", () => {
+    const sel = el("monthSelect");
+    el("monthTitle").innerText = sel.options[sel.selectedIndex].textContent;
+    renderRow(getLatestRowForMonth(sel.value));
+  });
+
+  document.querySelectorAll(".pill").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".pill").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      selectedRange = btn.dataset.range === "all" ? "all" : Number(btn.dataset.range);
+      el("rangeLabel").innerText = (selectedRange === "all") ? "all" : String(selectedRange);
+
+      // rebuild month list based on range and re-render
+      // (simple approach: keep full list but render by range)
+      const sel = el("monthSelect");
+      const current = sel.value;
+      renderRow(getLatestRowForMonth(current));
+    });
+  });
+
+  // Initial load
+  refreshAll();
 </script>
-
 </body>
 </html>

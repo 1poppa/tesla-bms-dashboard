@@ -332,8 +332,8 @@
     el("mCycles").innerText        = (cycles === null) ? "—" : fmtNum(cycles);
     el("mLifetimeEnergy").innerText= (lifetimeKwh === null) ? "—" : fmtKwh(lifetimeKwh);
 
-    const stamp = r.created_at || r.captured_at || r.inserted_at || r.timestamp;
-    el("lastUpdated").innerText = stamp ? new Date(stamp).toLocaleString() : "—";
+    const stamp = r.snapshot?.created_at || r.snapshot?.captured_at || r.created_at || r.captured_at;
+el("lastUpdated").innerText = stamp ? new Date(stamp).toLocaleString() : "—";
 
     const vName = pick(r, ["display_name", "vehicle_name", "name"]);
     el("vehicleName").innerText = vName ? vName : "(latest)";
@@ -389,6 +389,7 @@
 </script>
 </body>
 </html>
+
 
 
 
